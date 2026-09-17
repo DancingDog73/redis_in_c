@@ -18,36 +18,35 @@ static void die(const char *msg){
 
 
 int main(){
-    while(true){
-        int fd = socket(AF_INET, SOCK_STREAM, 0);
-        if(fd < 0){
-            die("socket()");
-        }
-
-        struct sockaddr_in addr = {};
-        addr.sin_family = AF_INET;
-        addr.sin_port = ntohs(1234);
-        addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
-        int rv = connect(fd, (const struct sockaddr *)&addr, sizeof(addr));
-        if(rv){
-            die("connect");
-        }
-
-        char msg[] = "hello";
-        ssize_t written = write(fd, msg, strlen(msg));
-        if(written < 0){
-            printf("something something...");
-        }
-
-        char rbuf[64] = {};
-        ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
-        if(n < 0){
-            die("read");
-        }
-        printf("server says: %s\n", rbuf);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        close(fd);
+    
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd < 0){
+        die("socket()");
     }
+
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = ntohs(1234);
+    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
+    int rv = connect(fd, (const struct sockaddr *)&addr, sizeof(addr));
+    if(rv){
+        die("connect");
+    }
+
+    char msg[] = "hello";
+    ssize_t written = write(fd, msg, strlen(msg));
+    if(written < 0){
+        printf("something something...");
+    }
+
+    char rbuf[64] = {};
+    ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
+    if(n < 0){
+        die("read");
+    }
+    printf("server says: %s\n", rbuf);
+    close(fd);
+    
     
 
 
