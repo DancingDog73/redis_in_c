@@ -38,6 +38,9 @@ static void do_something(int connfd){
 
 int main(){    
     int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(fd < 0){
+        die("socket()");
+    }
 
     int val = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
