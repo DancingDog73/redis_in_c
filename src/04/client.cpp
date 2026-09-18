@@ -30,6 +30,7 @@ static int32_t read_full(int fd, char *buf, size_t n){
         if(rv <= 0){
             return -1;
         }
+        if(rv == -1 && errno == EINTR){ continue; }
         assert((size_t) rv <= n);
         n -= (size_t)rv;
         buf += rv;
