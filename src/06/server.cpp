@@ -25,6 +25,25 @@ static void die(const char *msg){
     abort();
 }
 
+static void fd_set_nb(int fd){
+    errno = 0;
+    int flags = fcntl(fd, F_GETFL, 0);
+    if(errno){
+        die("fcntl error");
+        return;
+    }
+
+    flags |= O_NONBLOCK;
+    errno = 0;
+
+    (void)fcntl(fd, F_SETFL, flags);
+    if(errno){
+        die("fcntl error");
+    }
+}
+
+const size_t k_max_msg = 32 << 20;
+
 struct Conn {
     int fd = -1;
 
