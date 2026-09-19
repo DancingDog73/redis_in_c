@@ -10,6 +10,8 @@
 #include <netinet/ip.h>
 #include <chrono>
 #include <thread>
+#include <string>
+#include <vector>
 
 static void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
@@ -22,9 +24,9 @@ static void die(const char *msg){
 }
 
 
-const size_t k_max_msg = 4096;
+const size_t k_max_msg = 32 << 20;
 
-static int32_t read_full(int fd, char *buf, size_t n){
+static int32_t read_full(int fd, uint8_t *buf, size_t n){
     while(n > 0){
         ssize_t rv = read(fd, buf, n);
         if(rv <= 0){
@@ -38,7 +40,7 @@ static int32_t read_full(int fd, char *buf, size_t n){
     return 0;
 }
 
-static int32_t write_all(int fd, const char *buf, size_t n){
+static int32_t write_all(int fd, const uint8_t *buf, size_t n){
     while(n > 0){
         ssize_t rv = write(fd, buf, n);
         if(rv <= 0){
@@ -51,46 +53,57 @@ static int32_t write_all(int fd, const char *buf, size_t n){
     return 0;
 }
 
-static int32_t query(int fd, const char *text){
-    uint32_t len = (uint32_t)strlen(text);
+
+static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
+    buf.insert(buf.end(), data, data + len);
+}
+
+static int32_t send_req(int fd, const uint8_t *text, size_t len){
     if(len > k_max_msg){
         return -1;
     }
 
-    char wbuf[4+k_max_msg];
-    memcpy(wbuf, &len, 4);
-    memcpy(&wbuf[4], text, len);
-    if(int32_t err = write_all(fd, wbuf, 4 + len)){
-        return err;
-    }
+    std::vector<uint8_t> wbuf;
+    buf_append(wbuf, (const uint8_t *)&len, 4);
+    buf_append(wbuf, text, len);
+    return write_all(fd, wbuf.data(), wbuf.size());
+}
 
-    char rbuf[4 + k_max_msg];
+static int32_t read_res(int fd){
+    std::vector<uint8_t> rbuf;
+    rbuf.size();
     errno = 0;
-    int32_t err = read_full(fd, rbuf, 4);
+    int32_t err = read_full(fd, &rbuf[0], 4);
     if(err){
-        msg(errno == 0 ? "EOF" : "read() error");
+        if(errno == 0){
+            msg("EOF");
+        } else {
+            msg("read() error");
+        }
         return err;
     }
 
-    memcpy(&len, rbuf, 4);
+    uint32_t len = 0;
+    memcpy(&len, rbuf.data(), 4);
     if(len > k_max_msg){
         msg("too long");
         return -1;
     }
 
+    rbuf.resize(4 + len);
     err = read_full(fd, &rbuf[4], len);
     if(err){
         msg("read() error");
         return err;
     }
 
-    printf("server says: %.*s\n", len, &rbuf[4]);
+    printf("len: %u data:%.*s\n", len, len < 100 ? len : 100, &rbuf[4]);
     return 0;
 }
 
 int main(){
     
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    /*int fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){
         die("socket()");
     }
@@ -114,6 +127,6 @@ int main(){
     }
 
 L_DONE:
-    close(fd);
+    close(fd);*/
     return 0;
 }
