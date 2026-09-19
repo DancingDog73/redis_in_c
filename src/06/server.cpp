@@ -55,6 +55,40 @@ struct Conn {
     std::vector<uint8_t> outgoing;
 };
 
+static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
+    buf.insert(buf.end(), data, data + len);
+}
+
+static void buf_consume(std::vector<uint8_t> &buf, size_t n){
+    buf.erase(buf.begin(), buf.begin() + n);
+}
+
+static Conn *handle_accept(int fd){
+
+    struct sockaddr_in client_addr = {};
+    socklen_t addrlen = sizeof(client_addr);
+    int connfd = accept(fd, (struct sockaddr *)&client_addr, &addrlen);
+    if(connfd < 0){
+        msg_errno("accept() error");
+        return NULL;
+    }
+
+    uint32_t ip = client_addr.sin_addr.s_addr;
+    fprintf(stderr, "new client from %u.%u.%u.%u:%u\n",
+        ip & 255, (ip >> 8) & 255, (ip >> 16) & 255, ip >> 24, 
+        ntohs(client_addr.sin_port)     
+    );
+
+    fd_set_nb(connfd);
+
+    Conn *conn = new Conn();
+    conn->fd = connfd;
+    conn->want_read = true;
+    return conn;
+}
+
+
+
 
 int main(){    
     printf("My name is Zero sir !\n");
