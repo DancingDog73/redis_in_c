@@ -87,7 +87,35 @@ static Conn *handle_accept(int fd){
     return conn;
 }
 
+static bool try_one_request(Conn *conn){
+    if(conn->incoming.size() < 4){
+        return false;
+    }
 
+    uint32_t len = 0;
+    memcpy(&len, conn->incoming.data(), 4);
+    if(len > k_max_msg){
+        msg("too long");
+        conn->want_close = true;
+        return false;
+    }
+
+    if(4 + len > conn->incoming.size()){
+        return false;
+    }
+    const uint8_t *request = &conn->incoming[4];
+    printf("client says: len: %d data: %.*s\n",
+        len, len < 100 ? len : 100, request);
+    
+    buf_append(conn->outgoing, (const uint8_t *)&len, 4);
+    buf_append(conn->outgoing, request, len);
+
+    buf_consume(conn->incoming, 4 + len);
+
+    return true;
+
+
+}
 
 
 int main(){    
