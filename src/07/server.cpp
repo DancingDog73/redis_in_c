@@ -104,11 +104,15 @@ static bool try_one_request(Conn *conn){
         return false;
     }
     const uint8_t *request = &conn->incoming[4];
-    printf("client says: len: %d data: %.*s\n",
-        len, len < 100 ? len : 100, request);
-    
-    buf_append(conn->outgoing, (const uint8_t *)&len, 4);
-    buf_append(conn->outgoing, request, len);
+    std::vector<std::string> cmd;
+    if(parse_req(request, len, cmd)){
+        conn->want_close = true;
+        return false;
+    }
+
+    Response resp;
+    do_request(cmd, resp);
+    make_response(resp, conn->outgoing);
 
     buf_consume(conn->incoming, 4 + len);
 
