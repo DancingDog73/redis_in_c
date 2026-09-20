@@ -53,19 +53,29 @@ static int32_t write_all(int fd, const char *buf, size_t n){
 }
 
 
-static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
-    buf.insert(buf.end(), data, data + len);
-}
 
-static int32_t send_req(int fd, const uint8_t *text, size_t len){
+static int32_t send_req(int fd, const std::vector<std::string> &cmd){
+    uint32_t len = 4;
+    for(const std::string &s : cmd){
+        len += 4 + s.size();
+    }
     if(len > k_max_msg){
         return -1;
     }
 
-    std::vector<uint8_t> wbuf;
-    buf_append(wbuf, (const uint8_t *)&len, 4);
-    buf_append(wbuf, text, len);
-    return write_all(fd, wbuf.data(), wbuf.size());
+    char wbuf[4 + k_max_msg];
+    memcpy(&wbuf[0], &len, 4);
+    uint32_t n = cmd.size();
+    memcpy(&wbuf[4], &n, 4);
+    size_t cur = 8;
+    for(const std::string &s: cmd){
+        uint32_t p = (uint32_t)s.size();
+        memcpy(&wbuf[cur], &p, 4);
+        memcpy(&wbuf[cur + 4], s.data(), s.size());
+        cur += 4 + s.size();
+    }
+
+    return write_all(fd, wbuf, 4 + len);
 }
 
 static int32_t read_res(int fd){
