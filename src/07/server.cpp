@@ -88,6 +88,31 @@ static Conn *handle_accept(int fd){
     return conn;
 }
 
+struct Response {
+    uint32_t status = 0;
+    std::vector<uint8_t> data;
+};
+
+static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
+    if(cur + 4 > end){
+        return false;
+    }
+
+    memcpy(&out, cur, 4);
+    cur += 4;
+    return true;
+}
+
+static bool read_str(const uint8_t *&cur, const uint8_t *end, size_t n, string &out){
+    if(cur + n > end){
+        return false;
+    }
+
+    out.assign(cur, cur + n);
+    cur += n;
+    return true;
+}
+
 static int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::string> &out){
     const uint8_t *end = data + size;
     uint32_t nstr = 0;
