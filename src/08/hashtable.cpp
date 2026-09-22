@@ -18,6 +18,21 @@ static void h_insert(HTab *htab, HNode *node){
     htab->size++;
 }
 
+static HNode **h_lookup(HTab *htab, HNode *key, bool (*eq)(HNode *, HNode *)){
+    if(!htab->tab){
+        return NULL;
+    }
+
+    size_t pos = key->hcode & htab->mask;
+    HNode **from = &htab->tab[pos];
+    for(HNode *cur; (cur = *from) != NULL; from = &cur->next){
+        if(cur->hcode == key->hcode && eq(cur, key)){
+            return from;
+        }
+    }
+    return NULL;
+}
+
 int main(){
     return 0;
 }
