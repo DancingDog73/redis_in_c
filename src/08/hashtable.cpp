@@ -9,3 +9,15 @@ static void h_init(HTab *htab, size_t n){
     htab->mask = n-1;
     htab->size = 0;
 }
+
+static void h_insert(HTab *htab, HNode *node){
+    size_t pos = node->hcode & htab->mask;
+    HNode *next = htab->tab[pos];
+    node->next = next;
+    htab->tab[pos] = node;
+    htab->size++;
+}
+
+int main(){
+    return 0;
+}
