@@ -165,6 +165,17 @@ static void do_set(std::vector<std::string> &cmd, Response &){
 
 }
 
+static void do_del(std::vector<std::string> &cmd, Response &){
+    Entry key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
+
+    HNode *node = hm_delete(&g_data.db, &key.node, &entry_eq);
+    if(node){
+        delete container_of(node, Entry, node);
+    }
+}
+
 const size_t k_max_args = 200 * 1000;
 
 static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
@@ -220,9 +231,9 @@ static void do_request(std::vector<std::string> &cmd, Response &out){
     if(cmd.size() == 2 && cmd[0] == "get"){
        return  do_get(cmd, out);
     } else if(cmd.size() == 3 && cmd[0] == "set"){
-        return;
+        return  do_set(cmd, out);;
     } else if(cmd.size() == 2 && cmd[0] == "del"){
-        return;
+        return  do_del(cmd, out);
     } else {
         out.status = RES_ERR;
     }
