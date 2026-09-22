@@ -33,6 +33,13 @@ static HNode **h_lookup(HTab *htab, HNode *key, bool (*eq)(HNode *, HNode *)){
     return NULL;
 }
 
+static HNode *h_detach(HTab *htab, HNode **from){
+    HNode *node = *from;
+    *from = node->next;
+    htab->size--;
+    return node;
+}
+
 int main(){
     return 0;
 }
