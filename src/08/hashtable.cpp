@@ -105,6 +105,3 @@ void hm_insert(HMap *hmap, HNode *node) {
 }
 
 
-int main(){
-    return 0;
-}

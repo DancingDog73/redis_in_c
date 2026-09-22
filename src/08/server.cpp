@@ -123,6 +123,29 @@ static bool entry_eq(HNode *lhs, HNode *rhs){
     return le->key == re->key;
 }
 
+static uint64_t str_hash(const uint8_t *data, size_t len) {
+    uint32_t h = 0x811C9DC5;
+    for (size_t i = 0; i < len; i++) {
+        h = (h + data[i]) * 0x01000193;
+    }
+    return h;
+}
+
+static void do_get(std::vector<std::string> &cmd, Response &out){
+    Entry key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
+
+    HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
+    if(!node ){
+        out.status = RES_NX;
+        return;
+    }
+
+    const std::string &val = container_of(node, Entry, node)->val;
+    assert(val.size() <= k_max_msg);
+    out.data.assign(val.begin(), val.end());
+}
 
 const size_t k_max_args = 200 * 1000;
 
@@ -174,22 +197,14 @@ static int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::stri
     return 0;
 }
 
-static std::map<std::string, std::string> g_data;
 
 static void do_request(std::vector<std::string> &cmd, Response &out){
     if(cmd.size() == 2 && cmd[0] == "get"){
-        auto it = g_data.find(cmd[1]);
-        if(it == g_data.end()){
-            out.status = RES_NX;
-            return; 
-        }
-        const std::string &val = it->second;
-        out.data.assign(val.begin(), val.end());
-
+       return  do_get(cmd, out);
     } else if(cmd.size() == 3 && cmd[0] == "set"){
-        g_data[cmd[1]].swap(cmd[2]);
+        return;
     } else if(cmd.size() == 2 && cmd[0] == "del"){
-        g_data.erase(cmd[1]);
+        return;
     } else {
         out.status = RES_ERR;
     }
