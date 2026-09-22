@@ -69,6 +69,7 @@ HNode *hm_delete(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)){
     return NULL;
 }
 
+
 void hm_insert(HMap *hmap, HNode *node) {
     if(!hmap->newer.tab){
         h_init(&hmap->newer, 4);
@@ -82,6 +83,7 @@ void hm_insert(HMap *hmap, HNode *node) {
     }
     hm_help_rehashing(hmap);
 }
+
 
 int main(){
     return 0;
