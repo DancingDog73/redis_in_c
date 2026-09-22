@@ -14,6 +14,11 @@
 #include <string>
 #include <map>
 
+#include "hashtable.h"
+
+#define container_of(ptr, T, member) \
+    ((T *)( (char *)ptr - offsetof(T, member) ))
+
 static void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
 }
@@ -99,6 +104,25 @@ struct Response {
     uint32_t status = 0;
     std::vector<uint8_t> data;
 };
+
+
+static struct {
+    HMap db;
+
+} g_data;
+
+struct Entry {
+    struct HNode node;
+    std::string key;
+    std::string val; 
+};
+
+static bool entry_eq(HNode *lhs, HNode *rhs){
+    struct Entry *le = container_of(lhs, struct Entry, node);
+    struct Entry *re = container_of(rhs, struct Entry, node);
+    return le->key == re->key;
+}
+
 
 const size_t k_max_args = 200 * 1000;
 
