@@ -41,11 +41,31 @@ static HNode *h_detach(HTab *htab, HNode **from){
 }
 
 const size_t k_max_load_factor = 8;
+const size_t k_rehashing_work = 128;
 
 static void hm_trigger_rehashing(HMap *hmap){
     hmap->older = hmap->newer;
     h_init(&hmap->newer, (hmap->newer.mask + 1) * 2);
     hmap->migrate_pos = 0;
+}
+
+static void hm_help_rehashing(HMap *hmap){
+    size_t nwork = 0;
+    while(nwork < k_rehashing_work && hmap->older.size > 0){
+        HNode **from = &hmap->older.tab[hmap->migrate_pos];
+        if(!*from){
+            hmap->migrate_pos++;
+            continue;
+        }
+
+        h_insert(&hmap->newer, h_detach(&hmap->older, from));
+        nwork++;
+    }
+
+    if(hmap->older.size == 0 && hmap->older.tab){
+        free(hmap->older.tab);
+        hmap->older = HTab{};
+    }
 }
 
 HNode *hm_lookup(HMap *hmap, HNode *key, bool (*eq)(HNode *, HNode *)) {
