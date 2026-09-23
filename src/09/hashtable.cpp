@@ -104,4 +104,21 @@ void hm_insert(HMap *hmap, HNode *node) {
     hm_help_rehashing(hmap);
 }
 
+size_t hm_size(HMap *hmap) {
+    return hmap->newer.size + hmap->older.size;
+}
 
+static bool h_foreach(HTab *htab, bool (*f)(HNode *, void *), void *arg){
+    for(size_t i = 0; htab->mask != 0 && i <= htab->mask; i++){
+        for(HNode *node = htab->tab[i]; node != NULL; node = node->next){
+            if(!f(node, arg)){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void hm_foreach(HMap *hmap, bool (*f)(HNode *, void *), void *arg){
+    h_foreach(&hmap->newer, f, arg) && h_foreach(&hmap->older, f, arg);
+}
