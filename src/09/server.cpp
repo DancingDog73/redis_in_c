@@ -140,6 +140,16 @@ static uint64_t str_hash(const uint8_t *data, size_t len) {
     return h;
 }
 
+typedef std::vector<uint8_t> Buffer;
+
+static void buf_append_u8(Buffer &buf, uint8_t data){
+    buf.push_back(data);
+}
+
+static void buf_append_u32(Buffer &buf, uint32_t data){
+    buf_append(buf, (const uint8_t *)&data, 4);
+}
+
 static void out_nil(Buffer &out){
     buf_append_u8(out, TAG_NIL);
 }
@@ -299,9 +309,10 @@ static bool try_one_request(Conn *conn){
         return false;
     }
 
-    Response resp;
-    do_request(cmd, resp);
-    make_response(resp, conn->outgoing);
+    size_t header_pos = 0;
+    response_begin(conn->outgoing, &header_pos);
+    do_request(cmd, conn->outgoing);
+    response_end(conn->outgoing, header_pos);
 
     buf_consume(conn->incoming, 4 + len);
 
