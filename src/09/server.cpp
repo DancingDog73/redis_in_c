@@ -95,9 +95,8 @@ static Conn *handle_accept(int fd){
 }
 
 enum {
-    RES_OK = 0,
-    RES_ERR = 1,
-    RES_NX = 2,
+    ERR_UNKNOWN = 1,
+    ERR_TOO_BIG = 2,
 };
 
 enum {
@@ -173,7 +172,19 @@ static void out_int(Buffer &out, int64_t val){
     buf_append_i64(out, val);
 }
 
-static void out_err(Buffer &out, uint32_t n){
+static void out_dbl(Buffer &out, double val){
+    buf_append_u8(out, TAG_DBL);
+    buf_append_dbl(out, val);
+}
+
+static void out_err(Buffer &out, uint32_t code, const std::string &msg){
+    buf_append_u8(out, TAG_ERR);
+    buf_append_u32(out, code);
+    buf_append_u32(out, (uint32_t)msg.size());
+    buf_append(out, (const uint8_t *)msg.data(), msg.size());
+}
+
+static void out_arr(Buffer &out, uint32_t n){
     buf_append_u8(out, TAG_ARR);
     buf_append_u32(out, n);
 }
@@ -192,7 +203,7 @@ static void do_get(std::vector<std::string> &cmd, Buffer &out){
     return out_str(out, val.data(), val.size());
 }
 
-static void do_set(std::vector<std::string> &cmd, Buffer &){
+static void do_set(std::vector<std::string> &cmd, Buffer &out){
     Entry key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -212,7 +223,7 @@ static void do_set(std::vector<std::string> &cmd, Buffer &){
 
 }
 
-static void do_del(std::vector<std::string> &cmd, Buffer &){
+static void do_del(std::vector<std::string> &cmd, Buffer &out){
     Entry key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -231,7 +242,7 @@ static bool cb_keys(HNode *node, void *arg){
     return true;
 }
 
-static void do_keys(std::vector<std::string &, Buffer &out){
+static void do_keys(std::vector<std::string> &, Buffer &out){
     out_arr(out, (uint32_t)hm_size(&g_data.db));
     hm_foreach(&g_data.data, &cb_keys, (void *)&out);
 }
@@ -295,24 +306,20 @@ static void do_request(std::vector<std::string> &cmd, Buffer &out){
         return  do_set(cmd, out);;
     } else if(cmd.size() == 2 && cmd[0] == "del"){
         return  do_del(cmd, out);
+    } else if(cmd.size() == 1 && cmd[0] == "keys"){
+        return do_keys(cmd, out);
     } else {
-        out.status = RES_ERR;
+        return out_err(out, ERR_UNKNOWN, "unknown command.");
     }
 }
 
-static void make_response(const Response &resp, std::vector<uint8_t> &out){
-    uint32_t resp_len = 4 + (uint32_t)resp.data.size();
-    buf_append(out, (const uint8_t *)&resp_len, 4);
-    buf_append(out, (const uint8_t *)&resp.status, 4);
-    buf_append(out, resp.data.data(), resp.data.size());
-}
 
 static void response_begin(Buffer &out, size_t *header){
     *header = out.size();
     buf_append_u32(out, 0);
 }
 
-static response_size(Buffer &out, size_t header){
+static size_t response_size(Buffer &out, size_t header){
     return out.size() - header - 4;
 }
 
