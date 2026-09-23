@@ -107,7 +107,7 @@ enum {
     TAG_INT = 3;
     TAG_DBL = 4;
     TAG_ARR = 5;
-}
+};
 
 struct Response {
     uint32_t status = 0;
@@ -215,6 +215,19 @@ static void do_del(std::vector<std::string> &cmd, Buffer &){
     }
     return out_int(out, node ? 1 : 0);
 }
+
+static bool cb_keys(HNode *node, void *arg){
+    Buffer &out = *(Buffer *)arg;
+    const std::string &key = container_of(node, Entry, node)->key;
+    out_str(out, key.data(), key.size());
+    return true;
+}
+
+static void do_keys(std::vector<std::string &, Buffer &out){
+    out_arr(out, (uint32_t)hm_size(&g_data.db));
+    hm_foreach(&g_data.data, &cb_keys, (void *)&out);
+}
+
 
 const size_t k_max_args = 200 * 1000;
 
