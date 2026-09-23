@@ -101,12 +101,12 @@ enum {
 };
 
 enum {
-    TAG_NIL = 0;
-    TAG_ERR = 1;
-    TAG_STR = 2;
-    TAG_INT = 3;
-    TAG_DBL = 4;
-    TAG_ARR = 5;
+    TAG_NIL = 0,
+    TAG_ERR = 1,
+    TAG_STR = 2,
+    TAG_INT = 3,
+    TAG_DBL = 4,
+    TAG_ARR = 5,
 };
 
 struct Response {
@@ -150,13 +150,21 @@ static void buf_append_u32(Buffer &buf, uint32_t data){
     buf_append(buf, (const uint8_t *)&data, 4);
 }
 
+static void buf_append_i64(Buffer &buf, int64_t data){
+    buf_append(buf, (const uint8_t *)&data, 8);
+}
+
+static void buf_append_dbl(Buffer &buf, double data){
+    buf_append(buf, (const uint8_t *)&data, 8);
+}
+
 static void out_nil(Buffer &out){
     buf_append_u8(out, TAG_NIL);
 }
 
 static void out_str(Buffer &out, const char *s, size_t size){
     buf_append_u8(out, TAG_STR);
-    buf_append(out, (uint32_t) size);
+    buf_append_u32(out, (uint32_t) size);
     buf_append(out, (const uint8_t *)s, size);
 }
 
