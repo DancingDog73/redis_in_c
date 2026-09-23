@@ -165,7 +165,7 @@ static void out_int(Buffer &out, int64_t val){
     buf_append_i64(out, val);
 }
 
-static void out_arr(Buffer &out, uint32_t n){
+static void out_err(Buffer &out, uint32_t n){
     buf_append_u8(out, TAG_ARR);
     buf_append_u32(out, n);
 }
@@ -284,6 +284,27 @@ static void make_response(const Response &resp, std::vector<uint8_t> &out){
     buf_append(out, (const uint8_t *)&resp_len, 4);
     buf_append(out, (const uint8_t *)&resp.status, 4);
     buf_append(out, resp.data.data(), resp.data.size());
+}
+
+static void response_begin(Buffer &out, size_t *header){
+    *header = out.size();
+    buf_append_u32(out, 0);
+}
+
+static response_size(Buffer &out, size_t header){
+    return out.size() - header - 4;
+}
+
+static void response_end(Buffer &out, size_t header){
+    size_t msg_size = response_size(out, header);
+    if(msg_size > k_max_msg){
+        out.resize(header + 4);
+        out_err(out, ERR_TOO_BIG, "response is too big.");
+        msg_size = response_size(out, header);
+    }
+
+    uint32_t len = (uint32_t)msg_size;
+    memcpy(&out[header], &len, 4);
 }
 
 static bool try_one_request(Conn *conn){
