@@ -150,6 +150,22 @@ static void test_insert_dup(uint32_t sz){
     }
 }
 
+static void test_remove(uint32_t sz){
+    for(uint32_t val = 0; val < sz; ++val){
+        Container c;
+        std::multiset<uint32_t> ref;
+        for(uint32_t i=0; i < sz; ++i){
+            add(c, i);
+            ref.insert(i);
+        }
+        container_verify(c, ref);
+        assert(del(c, val));
+        ref.erase(val);
+        container_verify(c, ref);
+        dispose(c);
+    }
+}
+
 int main(){
 
     std::cout << "My name is Zero sir !\n";
