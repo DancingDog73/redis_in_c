@@ -30,6 +30,25 @@ static AVLNode *rot_left(AVLNode *node){
     return new_node;
 }
 
+static AVLNode *rot_right(AVLNode *node){
+    AVLNode *parent = node->parent;
+    AVLNode *new_node = node->left;
+    AVLNode *inner = new_node->right;
+
+    node->left = inner;
+    if(inner){
+        inner->parent = node;
+    }
+
+    new_node->parent = parent;
+    new_node->right = node;
+    node->parent = new_node;
+
+    avl_update(node);
+    avl_update(new_node);
+    return new_node;
+}
+
 int main(){
 
     std::cout << "My name is Zero sir !\n";
