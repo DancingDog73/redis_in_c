@@ -49,6 +49,47 @@ static AVLNode *rot_right(AVLNode *node){
     return new_node;
 }
 
+static AVLNode *avl_fix_left(AVLNode *node){
+    if(avl_height(node->left->left) < avl_height(node->left->right)){
+        node->left = rot_left(node->left);
+    }
+    return rot_right(node); 
+}
+
+static AVLNode *avl_fix_right(AVLNode *node){
+    if(avl_height(node->right->right) < avl_height(node->right->left)){
+        node->right = rot_right(node->right);
+    }
+    return rot_left(node); 
+}
+
+AVLNode *avl_fix (AVLNode *node){
+    while(true) {
+        AVLNode **from = &node;
+        AVLNode *parent = node->parent;
+        if(parent){
+            from = parent->left == node ? &parent->left : &parent->right;
+        }
+
+        avl_update(node);
+
+        uint32_t l = avl_height(node->left);
+        uint32_t r = avl_height(node->right);
+        if(l == r+2){
+            *from = avl_fix_left(node);
+        } else if(l + 2 == r){
+            *from = avl_fix_right(node);
+        }
+        if(!parent){
+            return *from;
+        }
+
+        node = parent;
+    }
+}
+
+
+
 int main(){
 
     std::cout << "My name is Zero sir !\n";
