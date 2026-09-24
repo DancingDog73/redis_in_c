@@ -145,8 +145,21 @@ struct Entry {
             zset_clear(&zset);
         }
     }
+
+    virtual ~Entry(){}
     
 };
+
+struct EntryKV : Entry {
+    std::string str;
+}
+
+struct EntryZSet : Entry {
+    ZSet zset;
+    virtual ~EntryZet(){
+        zset_clear(&zset);
+    }
+} 
 
 struct Entry {
     struct HNode node;
