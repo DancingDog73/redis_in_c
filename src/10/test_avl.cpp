@@ -85,6 +85,31 @@ static void avl_verify(AVLNode *parent, AVLNode *node){
     
 }
 
+static void extract(AVLNode *node, std::multiset<uint32_t> &extracted){
+    if(!node){
+        return;
+    }
+    extract(node->left, extracted);
+    extracted.insert(container_of(node, Data, node)->val);
+    extract(node->right, extracted);
+}
+
+static void container_verify(Container &c, const std::multiset<uint32_t> &ref){
+    avl_verify(NULL, c.root);
+    assert(avl_cnt(c.root) == ref.size());
+    std::multiset<uint32_t> extracted;
+    extract(c.root, extracted);
+    assert(extracted == ref);
+}
+
+static void dispose(Container &c){
+    while(c.root){
+        AVLNode *node = c.root;
+        c.root = avl_del(c.root);
+        delete container_of(node, Data, node);
+    }
+}
+
 
 int main(){
 
