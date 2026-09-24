@@ -1,4 +1,3 @@
-#include <iostream>
 #include <assert.h>
 #include "avl.h"
 
@@ -136,8 +135,3 @@ AVLNode *avl_del(AVLNode *node){
     return root;
 }
 
-int main(){
-
-    std::cout << "My name is Zero sir !\n";
-    return 0;
-}
