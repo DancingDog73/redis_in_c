@@ -11,6 +11,24 @@ static void avl_update(AVLNode *node){
     node->cnt = 1 + avl_cnt(node->left) + avl_cnt(node->right);
 }
 
+static AVLNode *rot_left(AVLNode *node){
+    AVLNode *parent = node->parent;
+    AVLNode *new_node = node->right;
+    AVLNode *inner = node->left;
+
+    node->right = inner;
+    if(inner){
+        inner->parent = node;
+    }
+
+    new_node->parent = parent;
+    new_node->left = node;
+    node->parent = new_node;
+
+    avl_update(node);
+    avl_update(new_node);
+    return new_node;
+}
 
 int main(){
 
