@@ -110,6 +110,45 @@ static void dispose(Container &c){
     }
 }
 
+static void test_insert(uint32_t sz){
+    for(uint32_t val = 0; val < sz; ++val){
+        Container c;
+        std::multiset<uint32_t> ref;
+        for(uint32_t i = 0; i < sz; ++i){
+            if(i == val){
+                continue;
+            }
+            add(c, i);
+            ref.insert(i);
+        }
+
+        container_verify(c, ref);
+
+        add(c, val);
+        ref.insert(val);
+        container_verify(c, ref);
+        dispose(c);
+    }
+}
+
+
+static void test_insert_dup(uint32_t sz){
+    for(uint32_t val = 0; val < sz; ++val){
+        Container c;
+        std::multiset<uint32_t> ref;
+        for(uint32_t i = 0; i < sz; ++i){
+            add(c, i);
+            ref.insert(i);
+        }
+
+        container_verify(c, ref);
+
+        add(c, val);
+        ref.insert(val);
+        container_verify(c, ref);
+        dispose(c);
+    }
+}
 
 int main(){
 
