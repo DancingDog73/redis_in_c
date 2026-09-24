@@ -88,7 +88,23 @@ AVLNode *avl_fix (AVLNode *node){
     }
 }
 
+static AVLNode *avl_del_easy(AVLNode *node){
+    assert(!node->left || !node->right);
+    AVLNode *child = node->left ? node->left : node->right;
+    AVLNode *parent = node->parent;
 
+    if(child){
+        child->parent = parent;
+    }
+
+    if(!parent){
+        return child;
+    }
+
+    AVLNode **from = parent->left == node ? &parent->left : &parent->right;
+    *from = child;
+    return avl_fix(parent);
+}
 
 int main(){
 
