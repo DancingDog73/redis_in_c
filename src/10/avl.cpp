@@ -13,7 +13,7 @@ static void avl_update(AVLNode *node){
 static AVLNode *rot_left(AVLNode *node){
     AVLNode *parent = node->parent;
     AVLNode *new_node = node->right;
-    AVLNode *inner = node->left;
+    AVLNode *inner = new_node->left;
 
     node->right = inner;
     if(inner){

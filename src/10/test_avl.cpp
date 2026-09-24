@@ -76,7 +76,7 @@ static void avl_verify(AVLNode *parent, AVLNode *node){
     uint32_t val = container_of(node, Data, node)->val;
     if(node->left){
         assert(node->left->parent == node);
-        assert(container_of(node->left, Data, node)->val >= val);
+        assert(container_of(node->left, Data, node)->val <= val);
     }
     if(node->right){
         assert(node->right->parent == node);
