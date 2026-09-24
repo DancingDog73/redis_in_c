@@ -119,6 +119,35 @@ static struct {
 
 } g_data;
 
+enum {
+    T_INIT = 0,
+    T_STR = 1,
+    T_ZSET = 2,
+};
+
+struct Entry {
+    struct HNode node;
+    std::string key;
+    
+    explicit Entry(uint32_t type = 0) {
+        if(type == T_STR){
+            new (&str) std::string;
+
+        } else {
+            new (&zset) ZSet;
+        }
+    }
+
+    ~Entry(){
+        if(type == T_STR){
+            str.~basic_string();
+        } else if(type == T_ZSET){
+            zset_clear(&zset);
+        }
+    }
+    
+};
+
 struct Entry {
     struct HNode node;
     std::string key;
