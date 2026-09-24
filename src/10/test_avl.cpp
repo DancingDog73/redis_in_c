@@ -57,6 +57,34 @@ static bool del(Container &c, uint32_t val){
     return true;
 }
 
+static void avl_verify(AVLNode *parent, AVLNode *node){
+    if(!node){
+        return;
+    }
+
+    assert(node->parent == parent);
+    avl_verify(node, node->left);
+    avl_verify(node, node->right);
+
+    assert(node->cnt == 1 + avl_cnt(node->left) + avl_cnt(node->right));
+
+    uint32_t l = avl_height(node->left);
+    uint32_t r = avl_height(node->right);
+    assert(l == r || l + 1 == r || l == r + 1);
+    assert(node->height == 1 + std::max(l, r));
+
+    uint32_t val = container_of(node, Data, node)->val;
+    if(node->left){
+        assert(node->left->parent == node);
+        assert(container_of(node->left, Data, node)->val >= val);
+    }
+    if(node->right){
+        assert(node->right->parent == node);
+        assert(container_of(node->right, Data, node)->val >= val);
+    }
+    
+}
+
 
 int main(){
 
