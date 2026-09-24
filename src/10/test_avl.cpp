@@ -167,7 +167,52 @@ static void test_remove(uint32_t sz){
 }
 
 int main(){
+    Container c;
 
-    std::cout << "My name is Zero sir !\n";
+    // some quick tests
+    container_verify(c, {});
+    add(c, 123);
+    container_verify(c, {123});
+    assert(!del(c, 124));
+    assert(del(c, 123));
+    container_verify(c, {});
+
+    // sequential insertion
+    std::multiset<uint32_t> ref;
+    for (uint32_t i = 0; i < 1000; i += 3) {
+        add(c, i);
+        ref.insert(i);
+        container_verify(c, ref);
+    }
+
+    // random insertion
+    for (uint32_t i = 0; i < 100; i++) {
+        uint32_t val = (uint32_t)rand() % 1000;
+        add(c, val);
+        ref.insert(val);
+        container_verify(c, ref);
+    }
+
+    // random deletion
+    for (uint32_t i = 0; i < 200; i++) {
+        uint32_t val = (uint32_t)rand() % 1000;
+        auto it = ref.find(val);
+        if (it == ref.end()) {
+            assert(!del(c, val));
+        } else {
+            assert(del(c, val));
+            ref.erase(it);
+        }
+        container_verify(c, ref);
+    }
+
+    // insertion/deletion at various positions
+    for (uint32_t i = 0; i < 200; ++i) {
+        test_insert(i);
+        test_insert_dup(i);
+        test_remove(i);
+    }
+
+    dispose(c);
     return 0;
 }
