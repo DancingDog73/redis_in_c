@@ -38,6 +38,25 @@ static void  add(Container &c, uint32_t val){
     c.root = avl_fix(&data->node);
 }
 
+static bool del(Container &c, uint32_t val){
+    AVLNode *cur = c.root;
+    while(cur){
+        uint32_t node_val = container_of(cur, Data, node)->val;
+        if(val == node_val){
+            break;
+        }
+        cur = val < node_val ? cur->left : cur->right;
+    }
+
+    if(!cur){
+        return false;
+    }
+
+    c.root = avl_del(cur);
+    delete container_of(cur, Data, node);
+    return true;
+}
+
 
 int main(){
 
