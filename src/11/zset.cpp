@@ -50,6 +50,34 @@ ZNode *zset_lookup(ZSet *zset, const char *name, size_t len){
     return found ? container_of(found, ZNode, hmap) : NULL;
 }
 
+static size_t min(size_t lhs, size_t rhs) {
+    return lhs < rhs ? lhs : rhs;
+}
+
+
+
+static bool zless(AVLNode *lhs, AVLNode *rhs){
+    ZNode *zl = container_of(lhs, ZNode, tree);
+    ZNode *zr = container_of(rhs, ZNode, tree);
+    if(zl->score != zr->score){
+        return zl->score < zr->score;
+    }
+    int rv = memcmp(zl->name, zr->name, min(zl->len, zr->len));
+    return (rv != 0) ? (rv < 0) : (zl->len < zr->len);
+}
+
+static void tree_insert(ZSet *zset, ZNode *node){
+    AVLNode *parent = NULL;
+    AVLNode **from = &zset->root;
+    while(*from){
+        parent = *from;
+        from = zless(&node->tree, parent) ? &parent->left : &parent->right;
+    }
+    *from = &node->tree;
+    node->tree.parent = parent;
+    zset->root = avl_fix(&node->tree);
+}
+
 
 int main(){}
 
