@@ -55,6 +55,20 @@ static size_t min(size_t lhs, size_t rhs) {
 }
 
 
+static bool zless(
+    AVLNode *lhs, double score, const char *name, size_t len)
+{
+    ZNode *zl = container_of(lhs, ZNode, tree);
+    if (zl->score != score) {
+        return zl->score < score;
+    }
+    int rv = memcmp(zl->name, name, min(zl->len, len));
+    if (rv != 0) {
+        return rv < 0;
+    }
+    return zl->len < len;
+}
+
 
 static bool zless(AVLNode *lhs, AVLNode *rhs){
     ZNode *zl = container_of(lhs, ZNode, tree);
@@ -110,6 +124,25 @@ void zset_delete(ZSet *zset, ZNode *node){
     zset->root = avl_del(&node->tree);
     znode_del(node);
 
+}
+
+ZNode *zset_seekge(ZSet *zset, double score , const char *name, size_t len){
+    AVLNode *found = NULL;
+    for(AVLNode *node = zset->root; node; ){
+        if(zless(node, score, name, len)){
+            node = node->right;
+        } else {
+            found = node;
+            node = node->left;
+        }
+    }
+
+    return found ? container_of(found, ZNode, tree) : NULL;
+}
+
+ZNode *znode_offset(ZNode *node, int64_t offset){
+    AVLNode *tnode = node ? avl_offset(&node->tree, offset) : NULL;
+    return tnode ? container_of(tnode, ZNode, tree) : NULL;
 }
 
 
