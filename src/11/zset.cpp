@@ -78,6 +78,40 @@ static void tree_insert(ZSet *zset, ZNode *node){
     zset->root = avl_fix(&node->tree);
 }
 
+static void zset_update(ZSet *zset, ZNode *node, double score){
+    zset->root = avl_del(&node->tree);
+    avl_init(&node->tree);
+
+    node->score = score;
+    tree_insert(zset, node);
+
+}
+
+bool zset_insert(ZSet *zset, const char *name, size_t len, double score){
+    ZNode *node = zset_lookup(zset, name, len);
+    if(node){
+        zset_update(zset, node,  score);
+        return false;
+    }
+    node = znode_new(name, len, score);
+    hm_insert(&zset->hmap, &node->hmap);
+    tree_insert(zset, node);
+    return true;
+}
+
+
+void zset_delete(ZSet *zset, ZNode *node){
+    HKey key;
+    key.node.hcode = node->hmap.hcode;
+    key.name = node->name;
+    key.len = node->len;
+    HNode *found = hm_delete(&zset->hmap, &key.node, &hcmp);
+    assert(found);
+    zset->root = avl_del(&node->tree);
+    znode_del(node);
+
+}
+
 
 int main(){}
 
