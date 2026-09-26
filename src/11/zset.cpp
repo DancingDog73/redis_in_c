@@ -146,5 +146,4 @@ ZNode *znode_offset(ZNode *node, int64_t offset){
 }
 
 
-int main(){}
 
