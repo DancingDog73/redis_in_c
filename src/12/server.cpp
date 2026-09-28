@@ -14,7 +14,10 @@
 #include <string>
 #include <map>
 
+#include "common.h"
+#include "zset.h"
 #include "hashtable.h"
+#include "list.h"
 
 #define container_of(ptr, T, member) \
     ((T *)( (char *)ptr - offsetof(T, member) ))
@@ -60,6 +63,9 @@ struct Conn {
 
     std::vector<uint8_t> incoming;
     std::vector<uint8_t> outgoing;
+
+    uint64_t last_active_ms = 0;
+    DList idle_node;
 };
 
 static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
@@ -117,6 +123,10 @@ struct Response {
 static struct {
     HMap db;
 
+    std::vector<Conn *> fd2conn;
+
+    DList idle_list;
+
 } g_data;
 
 enum {
@@ -126,46 +136,27 @@ enum {
 };
 
 struct Entry {
-    struct HNode node;
+    struct HNode node;  
     std::string key;
     
-    explicit Entry(uint32_t type = 0) {
-        if(type == T_STR){
-            new (&str) std::string;
-
-        } else {
-            new (&zset) ZSet;
-        }
-    }
-
-    ~Entry(){
-        if(type == T_STR){
-            str.~basic_string();
-        } else if(type == T_ZSET){
-            zset_clear(&zset);
-        }
-    }
-
-    virtual ~Entry(){}
+    uint32_t type = 0;
     
+    std::string str;
+    ZSet zset;
 };
+
 
 struct EntryKV : Entry {
     std::string str;
-}
+};
 
 struct EntryZSet : Entry {
     ZSet zset;
-    virtual ~EntryZet(){
+    virtual ~EntryZSet(){
         zset_clear(&zset);
     }
-} 
+}; 
 
-struct Entry {
-    struct HNode node;
-    std::string key;
-    std::string val; 
-};
 
 static bool entry_eq(HNode *lhs, HNode *rhs){
     struct Entry *le = container_of(lhs, struct Entry, node);
@@ -173,13 +164,6 @@ static bool entry_eq(HNode *lhs, HNode *rhs){
     return le->key == re->key;
 }
 
-static uint64_t str_hash(const uint8_t *data, size_t len) {
-    uint32_t h = 0x811C9DC5;
-    for (size_t i = 0; i < len; i++) {
-        h = (h + data[i]) * 0x01000193;
-    }
-    return h;
-}
 
 typedef std::vector<uint8_t> Buffer;
 
