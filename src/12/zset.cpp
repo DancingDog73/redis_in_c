@@ -145,5 +145,17 @@ ZNode *znode_offset(ZNode *node, int64_t offset){
     return tnode ? container_of(tnode, ZNode, tree) : NULL;
 }
 
+static void tree_dispose(AVLNode *node){
+    if(!node){
+        return;
+    }
+    tree_dispose(node->left);
+    tree_dispose(node->right);
+    znode_del(container_of(node, ZNode, tree));
+}
 
-
+void zset_clear(ZSet *zset){
+    hm_clear(&zset->hmap);
+    tree_dispose(zset->root);
+    zset->root = NULL;
+}

@@ -19,8 +19,6 @@
 #include "hashtable.h"
 #include "list.h"
 
-#define container_of(ptr, T, member) \
-    ((T *)( (char *)ptr - offsetof(T, member) ))
 
 static void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
@@ -103,6 +101,8 @@ static Conn *handle_accept(int fd){
 enum {
     ERR_UNKNOWN = 1,
     ERR_TOO_BIG = 2,
+    ERR_BAD_TYP = 3,
+    ERR_BAD_ARG = 4,
 };
 
 enum {
@@ -145,6 +145,18 @@ struct Entry {
     ZSet zset;
 };
 
+static Entry *entry_new(uint32_t type){
+    Entry *ent = new Entry();
+    ent->type = type;
+    return ent;
+}
+
+static void entry_del(Entry *ent){
+    if(ent->type == T_ZSET){
+        zset_clear(&ent->zset);
+    }
+    delete ent;
+}
 
 struct EntryKV : Entry {
     std::string str;
@@ -157,11 +169,15 @@ struct EntryZSet : Entry {
     }
 }; 
 
+struct LookupKey {
+    struct HNode node;
+    std::string key;
+};
 
-static bool entry_eq(HNode *lhs, HNode *rhs){
-    struct Entry *le = container_of(lhs, struct Entry, node);
-    struct Entry *re = container_of(rhs, struct Entry, node);
-    return le->key == re->key;
+static bool entry_eq(HNode *node, HNode *key){
+    struct Entry *ent = container_of(node, struct Entry, node);
+    struct LookupKey *keydata = container_of(key, struct LookupKey, node);
+    return ent->key == keydata->key;
 }
 
 
@@ -216,7 +232,7 @@ static void out_arr(Buffer &out, uint32_t n){
 }
 
 static void do_get(std::vector<std::string> &cmd, Buffer &out){
-    Entry key;
+    LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
 
@@ -225,23 +241,31 @@ static void do_get(std::vector<std::string> &cmd, Buffer &out){
         return out_nil(out);
     }
 
-    const std::string &val = container_of(node, Entry, node)->val;
-    return out_str(out, val.data(), val.size());
+    Entry *ent = container_of(node, Entry, node);
+    if(ent->type != T_STR){
+        return out_err(out, ERR_BAD_TYP, "not a string value");
+    }
+    
+    return out_str(out, ent->str.data(), ent->str.size());
 }
 
 static void do_set(std::vector<std::string> &cmd, Buffer &out){
-    Entry key;
+    LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
 
     HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
     if(node){
-        container_of(node, Entry, node) -> val.swap(cmd[2]);
+        Entry *ent = container_of(node, Entry, node);
+        if(ent->type != T_STR){
+            return out_err(out, ERR_BAD_TYP, "a non-string value exists");
+        }
+        ent->str.swap(cmd[2]);
     }  else {
-        Entry *ent = new Entry();
+        Entry *ent = entry_new(T_STR);
         ent->key.swap(key.key);
         ent->node.hcode = key.node.hcode;
-        ent->val.swap(cmd[2]);
+        ent->str.swap(cmd[2]);
         hm_insert(&g_data.db, &ent->node);
     }
 
@@ -250,13 +274,13 @@ static void do_set(std::vector<std::string> &cmd, Buffer &out){
 }
 
 static void do_del(std::vector<std::string> &cmd, Buffer &out){
-    Entry key;
+    LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
 
     HNode *node = hm_delete(&g_data.db, &key.node, &entry_eq);
     if(node){
-        delete container_of(node, Entry, node);
+        entry_del(container_of(node, Entry, node));
     }
     return out_int(out, node ? 1 : 0);
 }
