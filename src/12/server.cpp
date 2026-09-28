@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <math.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
@@ -12,7 +13,6 @@
 #include <netinet/ip.h>
 #include <vector>
 #include <string>
-#include <map>
 
 #include "common.h"
 #include "zset.h"
@@ -66,6 +66,16 @@ struct Conn {
     DList idle_node;
 };
 
+static struct {
+    HMap db;
+
+    std::vector<Conn *> fd2conn;
+
+    DList idle_list;
+
+} g_data;
+
+
 static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
     buf.insert(buf.end(), data, data + len);
 }
@@ -98,6 +108,15 @@ static Conn *handle_accept(int fd){
     return conn;
 }
 
+static void conn_destroy(Conn *conn){
+    (void)close(conn->fd);
+    g_data.fd2conn[conn->fd] = NULL;
+    dlist_detach(&conn->idle_node);
+    delete conn;
+}
+
+const size_t k_max_args = 200 * 1000;
+
 enum {
     ERR_UNKNOWN = 1,
     ERR_TOO_BIG = 2,
@@ -114,20 +133,7 @@ enum {
     TAG_ARR = 5,
 };
 
-struct Response {
-    uint32_t status = 0;
-    std::vector<uint8_t> data;
-};
 
-
-static struct {
-    HMap db;
-
-    std::vector<Conn *> fd2conn;
-
-    DList idle_list;
-
-} g_data;
 
 enum {
     T_INIT = 0,
@@ -158,16 +164,6 @@ static void entry_del(Entry *ent){
     delete ent;
 }
 
-struct EntryKV : Entry {
-    std::string str;
-};
-
-struct EntryZSet : Entry {
-    ZSet zset;
-    virtual ~EntryZSet(){
-        zset_clear(&zset);
-    }
-}; 
 
 struct LookupKey {
     struct HNode node;
@@ -297,8 +293,48 @@ static void do_keys(std::vector<std::string> &, Buffer &out){
     hm_foreach(&g_data.db, &cb_keys, (void *)&out);
 }
 
+static bool str2dbl(const std::string &s, double &out){
+    char *endp = NULL;
+    out = strtod(s.c_str(), &endp);
+    return endp == s.c_str() + s.size() && !isnan(out);
+}
 
-const size_t k_max_args = 200 * 1000;
+static bool str2int(const std::string &s, int64_t &out){
+    char *endp = NULL;
+    out = strtoll(s.c_str(), &endp, 10);
+    return endp == s.c_str() + s.size();
+}
+
+static void do_zadd(std::vector<std::string> &cmd, Buffer &out){
+    double score = 0;
+    if(!str2dbl(cmd[2], score)){
+        return out_err(out, ERR_BAD_ARG, "expect float");
+    }
+
+    LookupKey key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
+    HNode *hnode = hm_lookup(&g_data.db, &key.node, &entry_eq);
+
+    Entry *ent = NULL;
+    if(!hnode){
+        ent = entry_new(T_ZSET);
+        ent->key.swap(key.key);
+        ent->node.hcode = key.node.hcode;
+        hm_insert(&g_data.db, &ent->node);
+    } else {
+        ent = container_of(hnode, Entry, node);
+        if(ent->type != T_ZSET){
+            return out_err(out, ERR_BAD_TYP, "expect zset");
+        }
+    }
+
+    const std::string &name = cmd[3];
+    bool added = zset_insert(&ent->zset, name.data(), name.size(), score);
+    return out_int(out, (int64_t)added);
+}
+
+static const ZSet k_empty_zset;
 
 static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
     if(cur + 4 > end){
@@ -353,7 +389,7 @@ static void do_request(std::vector<std::string> &cmd, Buffer &out){
     if(cmd.size() == 2 && cmd[0] == "get"){
        return  do_get(cmd, out);
     } else if(cmd.size() == 3 && cmd[0] == "set"){
-        return  do_set(cmd, out);;
+        return  do_set(cmd, out);
     } else if(cmd.size() == 2 && cmd[0] == "del"){
         return  do_del(cmd, out);
     } else if(cmd.size() == 1 && cmd[0] == "keys"){
