@@ -447,7 +447,7 @@ static void do_zquery(std::vector<std::string> &cmd, Buffer &out){
 
     const std::string &name = cmd[3];
     int64_t offset = 0, limit = 0;
-    if(!str2int(cmd[4], offset) || str2int(cmd[5], limit)){
+    if(!str2int(cmd[4], offset) || !str2int(cmd[5], limit)){
         return out_err(out, ERR_BAD_ARG, "expect int");
     }
 
@@ -472,6 +472,45 @@ static void do_zquery(std::vector<std::string> &cmd, Buffer &out){
         n += 2;
     }
     out_end_arr(out, ctx, (uint32_t)n);
+}
+
+static void do_expire(std::vector<std::string> &cmd, Buffer &out) {
+    
+    int64_t ttl_ms = 0;
+    if (!str2int(cmd[2], ttl_ms)) {
+        return out_err(out, ERR_BAD_ARG, "expect int64");
+    }
+    
+    LookupKey key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
+    HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
+    
+    if (node) {
+        Entry *ent = container_of(node, Entry, node);
+        entry_set_ttl(ent, ttl_ms);
+    }
+    return out_int(out, node ? 1: 0);
+}
+
+static void do_ttl(std::vector<std::string> &cmd, Buffer &out) {
+    LookupKey key;
+    key.key.swap(cmd[1]);
+    key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
+
+    HNode *node = hm_lookup(&g_data.db, &key.node, &entry_eq);
+    if (!node) {
+        return out_int(out, -2);    // not found
+    }
+
+    Entry *ent = container_of(node, Entry, node);
+    if (ent->heap_idx == (size_t)-1) {
+        return out_int(out, -1);    // no TTL
+    }
+
+    uint64_t expire_at = g_data.heap[ent->heap_idx].val;
+    uint64_t now_ms = get_monotonic_msec();
+    return out_int(out, expire_at > now_ms ? (expire_at - now_ms) : 0);
 }
 
 static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
@@ -528,6 +567,10 @@ static void do_request(std::vector<std::string> &cmd, Buffer &out){
        return  do_get(cmd, out);
     } else if(cmd.size() == 3 && cmd[0] == "set"){
         return  do_set(cmd, out);
+    }  else if (cmd.size() == 3 && cmd[0] == "pexpire") {
+        return do_expire(cmd, out);
+    } else if (cmd.size() == 2 && cmd[0] == "pttl") {
+        return do_ttl(cmd, out);
     } else if(cmd.size() == 2 && cmd[0] == "del"){
         return  do_del(cmd, out);
     } else if(cmd.size() == 1 && cmd[0] == "keys"){

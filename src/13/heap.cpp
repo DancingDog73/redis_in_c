@@ -63,12 +63,3 @@ void heap_update(HeapItem *a, size_t pos, size_t len) {
     }
 }
 
-static void heap_delete(std::vector<HeapItem> &a, size_t pos) {
-
-    a[pos] = a.back();
-    a.pop_back();
-
-    if (pos < a.size()) {
-        heap_update(a.data(), pos, a.size());
-    }
-}
