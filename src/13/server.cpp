@@ -18,7 +18,7 @@
 #include "zset.h"
 #include "hashtable.h"
 #include "list.h"
-
+#include "heap.h"
 
 static void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
@@ -78,6 +78,8 @@ static struct {
     std::vector<Conn *> fd2conn;
 
     DList idle_list;
+
+    std::vector<HeapItem> heap;
 
 } g_data;
 
@@ -158,6 +160,8 @@ enum {
 struct Entry {
     struct HNode node;  
     std::string key;
+
+    size_t heap_idx = -1;
     
     uint32_t type = 0;
     
@@ -171,12 +175,16 @@ static Entry *entry_new(uint32_t type){
     return ent;
 }
 
-static void entry_del(Entry *ent){
-    if(ent->type == T_ZSET){
+static void entry_set_ttl(Entry *ent, int64_t ttl_ms);
+
+static void entry_del(Entry *ent) {
+    if (ent->type == T_ZSET) {
         zset_clear(&ent->zset);
     }
+    entry_set_ttl(ent, -1); 
     delete ent;
 }
+
 
 
 struct LookupKey {
@@ -316,6 +324,39 @@ static bool cb_keys(HNode *node, void *arg){
 static void do_keys(std::vector<std::string> &, Buffer &out){
     out_arr(out, (uint32_t)hm_size(&g_data.db));
     hm_foreach(&g_data.db, &cb_keys, (void *)&out);
+}
+
+static void heap_delete(std::vector<HeapItem> &a, size_t pos) {
+    
+    a[pos] = a.back();
+    a.pop_back();
+    
+    if (pos < a.size()) {
+        heap_update(a.data(), pos, a.size());
+    }
+}
+
+static void heap_upsert(std::vector<HeapItem> &a, size_t pos, HeapItem t) {
+    if (pos < a.size()) {
+        a[pos] = t;         
+    } else {
+        pos = a.size();
+        a.push_back(t);     
+    }
+    heap_update(a.data(), pos, a.size());
+}
+
+static void entry_set_ttl(Entry *ent, int64_t ttl_ms) {
+    if (ttl_ms < 0 && ent->heap_idx != (size_t)-1) {
+        
+        heap_delete(g_data.heap, ent->heap_idx);
+        ent->heap_idx = -1;
+    } else if (ttl_ms >= 0) {
+        
+        uint64_t expire_at = get_monotonic_msec() + (uint64_t)ttl_ms;
+        HeapItem item = {expire_at, &ent->heap_idx};
+        heap_upsert(g_data.heap, ent->heap_idx, item);
+    }
 }
 
 static bool str2dbl(const std::string &s, double &out){
