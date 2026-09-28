@@ -1,4 +1,7 @@
+#include <vector>
+
 #include "heap.h"
+
 
 
 static size_t heap_parent(size_t i) {
@@ -57,5 +60,15 @@ void heap_update(HeapItem *a, size_t pos, size_t len) {
         heap_up(a, pos);
     } else {
         heap_down(a, pos, len);
+    }
+}
+
+static void heap_delete(std::vector<HeapItem> &a, size_t pos) {
+
+    a[pos] = a.back();
+    a.pop_back();
+
+    if (pos < a.size()) {
+        heap_update(a.data(), pos, a.size());
     }
 }
