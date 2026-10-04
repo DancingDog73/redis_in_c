@@ -41,4 +41,3 @@ void thread_pool_queue(TheadPool *tp, void (*f)(void *), void *arg){
     pthread_mutex_unlock(&tp->mu);
 }
 
-int main(){}

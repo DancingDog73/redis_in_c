@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <math.h>
+#include <time.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
@@ -19,6 +20,7 @@
 #include "hashtable.h"
 #include "list.h"
 #include "heap.h"
+#include "thread_pool.h"
 
 static void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
@@ -80,6 +82,8 @@ static struct {
     DList idle_list;
 
     std::vector<HeapItem> heap;
+
+    TheadPool thread_pool;
 
 } g_data;
 
@@ -177,12 +181,27 @@ static Entry *entry_new(uint32_t type){
 
 static void entry_set_ttl(Entry *ent, int64_t ttl_ms);
 
-static void entry_del(Entry *ent) {
-    if (ent->type == T_ZSET) {
+static void entry_del_sync(Entry *ent){
+    if(ent->type == T_ZSET){
         zset_clear(&ent->zset);
     }
-    entry_set_ttl(ent, -1); 
     delete ent;
+}
+
+static void entry_del_func(void *arg){
+    entry_del_sync((Entry *)arg);
+}
+
+static void entry_del(Entry *ent){
+    entry_set_ttl(ent, -1);
+
+    size_t set_size = (ent->type == T_ZSET) ? hm_size(&ent->zset.hmap) : 0;
+    const size_t k_large_container_size = 1000;
+    if(set_size > k_large_container_size){
+        thread_pool_queue(&g_data.thread_pool, &entry_del_func, ent);
+    } else {
+        entry_del_sync(ent);
+    }
 }
 
 
@@ -758,6 +777,7 @@ static void process_timers() {
 
 int main(){    
     dlist_init(&g_data.idle_list);
+    thread_pool_init(&g_data.thread_pool, 4);
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){
