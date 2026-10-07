@@ -406,7 +406,7 @@ static void do_zquery(std::vector<std::string> &cmd, Buffer &out){
 
     const std::string &name = cmd[3];
     int64_t offset = 0, limit = 0;
-    if(!str2int(cmd[4], offset) || str2int(cmd[5], limit)){
+    if(!str2int(cmd[4], offset) || !str2int(cmd[5], limit)){
         return out_err(out, ERR_BAD_ARG, "expect int");
     }
 
