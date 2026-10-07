@@ -4,16 +4,21 @@ project(REDIS_CLONE VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(PROJECT_SOURCES
-    src/14/avl.cpp
-    src/14/hashtable.cpp
-    src/14/heap.cpp
-    src/14/server.cpp
-    src/14/thread_pool.cpp
-    src/14/zset.cpp
+set(CLIENT_SOURCES
+    src/14/client/client.cpp
+)
+
+set(SERVER_SOURCES
+    src/14/server/avl.cpp
+    src/14/server/hashtable.cpp
+    src/14/server/heap.cpp
+    src/14/server/server.cpp
+    src/14/server/thread_pool.cpp
+    src/14/server/zset.cpp
     
 )
 
-add_executable(redis_clone ${PROJECT_SOURCES})
+add_executable(client ${CLIENT_SOURCES})
+add_executable(server ${SERVER_SOURCES})
 
 

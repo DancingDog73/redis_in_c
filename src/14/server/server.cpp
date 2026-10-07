@@ -718,7 +718,7 @@ static void handle_read(Conn *conn){
     }
 }
 
-const uint64_t k_idle_timeout_ms = 5 * 1000;
+const uint64_t k_idle_timeout_ms = 5 * 60 * 1000;
 
 static uint32_t next_timer_ms() {
     uint64_t now_ms = get_monotonic_msec();
