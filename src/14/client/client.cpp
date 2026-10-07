@@ -41,7 +41,9 @@ static int32_t write_all(int fd, const char *buf, size_t n) {
     while (n > 0) {
         ssize_t rv = write(fd, buf, n);
         if (rv <= 0) {
+
             return -1;  
+
         }
         assert((size_t)rv <= n);
         n -= (size_t)rv;
@@ -62,7 +64,9 @@ static int32_t send_req(int fd, const std::vector<std::string> &cmd) {
     }
 
     char wbuf[4 + k_max_msg];
+
     memcpy(&wbuf[0], &len, 4); 
+
     uint32_t n = (uint32_t)cmd.size();
     memcpy(&wbuf[4], &n, 4);
     size_t cur = 8;
