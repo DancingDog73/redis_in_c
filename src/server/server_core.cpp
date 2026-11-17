@@ -15,33 +15,31 @@
 #include <vector>
 #include <string>
 
-#include "common.h"
-#include "zset.h"
-#include "hashtable.h"
-#include "list.h"
-#include "heap.h"
-#include "thread_pool.h"
 
-static void msg(const char *msg){
+#include "server_core.hpp"
+
+GlobalData g_data; 
+
+void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);
 }
 
-static void msg_errno(const char *msg){
+void msg_errno(const char *msg){
     fprintf(stderr, "[errno:%d] %s\n", errno, msg);
 }
 
-static void die(const char *msg){
+void die(const char *msg){
     fprintf(stderr, "[%d], %s\n", errno, msg);
     abort();
 }
 
-static uint64_t get_monotonic_msec() {
+uint64_t get_monotonic_msec() {
     struct timespec tv = {0, 0};
     clock_gettime(CLOCK_MONOTONIC, &tv);
     return uint64_t(tv.tv_sec) * 1000 + tv.tv_nsec / 1000 / 1000;
 }
 
-static void fd_set_nb(int fd){
+void fd_set_nb(int fd){
     errno = 0;
     int flags = fcntl(fd, F_GETFL, 0);
     if(errno){
@@ -60,43 +58,18 @@ static void fd_set_nb(int fd){
 
 const size_t k_max_msg = 32 << 20;
 
-struct Conn {
-    int fd = -1;
-
-    bool want_read = false;
-    bool want_write = false;
-    bool want_close = false;
-
-    std::vector<uint8_t> incoming;
-    std::vector<uint8_t> outgoing;
-
-    uint64_t last_active_ms = 0;
-    DList idle_node;
-};
-
-static struct {
-    HMap db;
-
-    std::vector<Conn *> fd2conn;
-
-    DList idle_list;
-
-    std::vector<HeapItem> heap;
-
-    TheadPool thread_pool;
-
-} g_data;
 
 
-static void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
+
+void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len){
     buf.insert(buf.end(), data, data + len);
 }
 
-static void buf_consume(std::vector<uint8_t> &buf, size_t n){
+void buf_consume(std::vector<uint8_t> &buf, size_t n){
     buf.erase(buf.begin(), buf.begin() + n);
 }
 
-static int32_t handle_accept(int fd){
+int32_t handle_accept(int fd){
 
     struct sockaddr_in client_addr = {};
     socklen_t addrlen = sizeof(client_addr);
@@ -128,7 +101,7 @@ static int32_t handle_accept(int fd){
     return 0;
 }
 
-static void conn_destroy(Conn *conn){
+void conn_destroy(Conn *conn){
     (void)close(conn->fd);
     g_data.fd2conn[conn->fd] = NULL;
     dlist_detach(&conn->idle_node);
@@ -137,62 +110,27 @@ static void conn_destroy(Conn *conn){
 
 const size_t k_max_args = 200 * 1000;
 
-enum {
-    ERR_UNKNOWN = 1,
-    ERR_TOO_BIG = 2,
-    ERR_BAD_TYP = 3,
-    ERR_BAD_ARG = 4,
-};
 
-enum {
-    TAG_NIL = 0,
-    TAG_ERR = 1,
-    TAG_STR = 2,
-    TAG_INT = 3,
-    TAG_DBL = 4,
-    TAG_ARR = 5,
-};
-
-
-
-enum {
-    T_INIT = 0,
-    T_STR = 1,
-    T_ZSET = 2,
-};
-
-struct Entry {
-    struct HNode node;  
-    std::string key;
-
-    size_t heap_idx = -1;
-    
-    uint32_t type = 0;
-    
-    std::string str;
-    ZSet zset;
-};
-
-static Entry *entry_new(uint32_t type){
+Entry *entry_new(uint32_t type){
     Entry *ent = new Entry();
     ent->type = type;
     return ent;
 }
 
-static void entry_set_ttl(Entry *ent, int64_t ttl_ms);
+void entry_set_ttl(Entry *ent, int64_t ttl_ms);
 
-static void entry_del_sync(Entry *ent){
+void entry_del_sync(Entry *ent){
     if(ent->type == T_ZSET){
         zset_clear(&ent->zset);
     }
     delete ent;
 }
 
-static void entry_del_func(void *arg){
+void entry_del_func(void *arg){
     entry_del_sync((Entry *)arg);
 }
 
-static void entry_del(Entry *ent){
+void entry_del(Entry *ent){
     entry_set_ttl(ent, -1);
 
     size_t set_size = (ent->type == T_ZSET) ? hm_size(&ent->zset.hmap) : 0;
@@ -205,13 +143,7 @@ static void entry_del(Entry *ent){
 }
 
 
-
-struct LookupKey {
-    struct HNode node;
-    std::string key;
-};
-
-static bool entry_eq(HNode *node, HNode *key){
+bool entry_eq(HNode *node, HNode *key){
     struct Entry *ent = container_of(node, struct Entry, node);
     struct LookupKey *keydata = container_of(key, struct LookupKey, node);
     return ent->key == keydata->key;
@@ -220,66 +152,66 @@ static bool entry_eq(HNode *node, HNode *key){
 
 typedef std::vector<uint8_t> Buffer;
 
-static void buf_append_u8(Buffer &buf, uint8_t data){
+void buf_append_u8(Buffer &buf, uint8_t data){
     buf.push_back(data);
 }
 
-static void buf_append_u32(Buffer &buf, uint32_t data){
+void buf_append_u32(Buffer &buf, uint32_t data){
     buf_append(buf, (const uint8_t *)&data, 4);
 }
 
-static void buf_append_i64(Buffer &buf, int64_t data){
+void buf_append_i64(Buffer &buf, int64_t data){
     buf_append(buf, (const uint8_t *)&data, 8);
 }
 
-static void buf_append_dbl(Buffer &buf, double data){
+void buf_append_dbl(Buffer &buf, double data){
     buf_append(buf, (const uint8_t *)&data, 8);
 }
 
-static void out_nil(Buffer &out){
+void out_nil(Buffer &out){
     buf_append_u8(out, TAG_NIL);
 }
 
-static void out_str(Buffer &out, const char *s, size_t size){
+void out_str(Buffer &out, const char *s, size_t size){
     buf_append_u8(out, TAG_STR);
     buf_append_u32(out, (uint32_t) size);
     buf_append(out, (const uint8_t *)s, size);
 }
 
-static void out_int(Buffer &out, int64_t val){
+void out_int(Buffer &out, int64_t val){
     buf_append_u8(out, TAG_INT);
     buf_append_i64(out, val);
 }
 
-static void out_dbl(Buffer &out, double val){
+void out_dbl(Buffer &out, double val){
     buf_append_u8(out, TAG_DBL);
     buf_append_dbl(out, val);
 }
 
-static void out_err(Buffer &out, uint32_t code, const std::string &msg){
+void out_err(Buffer &out, uint32_t code, const std::string &msg){
     buf_append_u8(out, TAG_ERR);
     buf_append_u32(out, code);
     buf_append_u32(out, (uint32_t)msg.size());
     buf_append(out, (const uint8_t *)msg.data(), msg.size());
 }
 
-static void out_arr(Buffer &out, uint32_t n){
+void out_arr(Buffer &out, uint32_t n){
     buf_append_u8(out, TAG_ARR);
     buf_append_u32(out, n);
 }
 
-static size_t out_begin_arr(Buffer &out){
+size_t out_begin_arr(Buffer &out){
     out.push_back(TAG_ARR);
     buf_append_u32(out, 0);
     return out.size() - 4;
 }
 
-static void out_end_arr(Buffer &out, size_t ctx, uint32_t n){
+void out_end_arr(Buffer &out, size_t ctx, uint32_t n){
     assert(out[ctx - 1] == TAG_ARR);
     memcpy(&out[ctx], &n, 4);
 }
 
-static void do_get(std::vector<std::string> &cmd, Buffer &out){
+void do_get(std::vector<std::string> &cmd, Buffer &out){
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -297,7 +229,7 @@ static void do_get(std::vector<std::string> &cmd, Buffer &out){
     return out_str(out, ent->str.data(), ent->str.size());
 }
 
-static void do_set(std::vector<std::string> &cmd, Buffer &out){
+void do_set(std::vector<std::string> &cmd, Buffer &out){
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -321,7 +253,7 @@ static void do_set(std::vector<std::string> &cmd, Buffer &out){
 
 }
 
-static void do_del(std::vector<std::string> &cmd, Buffer &out){
+void do_del(std::vector<std::string> &cmd, Buffer &out){
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -333,19 +265,19 @@ static void do_del(std::vector<std::string> &cmd, Buffer &out){
     return out_int(out, node ? 1 : 0);
 }
 
-static bool cb_keys(HNode *node, void *arg){
+bool cb_keys(HNode *node, void *arg){
     Buffer &out = *(Buffer *)arg;
     const std::string &key = container_of(node, Entry, node)->key;
     out_str(out, key.data(), key.size());
     return true;
 }
 
-static void do_keys(std::vector<std::string> &, Buffer &out){
+void do_keys(std::vector<std::string> &, Buffer &out){
     out_arr(out, (uint32_t)hm_size(&g_data.db));
     hm_foreach(&g_data.db, &cb_keys, (void *)&out);
 }
 
-static void heap_delete(std::vector<HeapItem> &a, size_t pos) {
+void heap_delete(std::vector<HeapItem> &a, size_t pos) {
     
     a[pos] = a.back();
     a.pop_back();
@@ -355,7 +287,7 @@ static void heap_delete(std::vector<HeapItem> &a, size_t pos) {
     }
 }
 
-static void heap_upsert(std::vector<HeapItem> &a, size_t pos, HeapItem t) {
+void heap_upsert(std::vector<HeapItem> &a, size_t pos, HeapItem t) {
     if (pos < a.size()) {
         a[pos] = t;         
     } else {
@@ -365,7 +297,7 @@ static void heap_upsert(std::vector<HeapItem> &a, size_t pos, HeapItem t) {
     heap_update(a.data(), pos, a.size());
 }
 
-static void entry_set_ttl(Entry *ent, int64_t ttl_ms) {
+void entry_set_ttl(Entry *ent, int64_t ttl_ms) {
     if (ttl_ms < 0 && ent->heap_idx != (size_t)-1) {
         
         heap_delete(g_data.heap, ent->heap_idx);
@@ -378,19 +310,19 @@ static void entry_set_ttl(Entry *ent, int64_t ttl_ms) {
     }
 }
 
-static bool str2dbl(const std::string &s, double &out){
+bool str2dbl(const std::string &s, double &out){
     char *endp = NULL;
     out = strtod(s.c_str(), &endp);
     return endp == s.c_str() + s.size() && !isnan(out);
 }
 
-static bool str2int(const std::string &s, int64_t &out){
+bool str2int(const std::string &s, int64_t &out){
     char *endp = NULL;
     out = strtoll(s.c_str(), &endp, 10);
     return endp == s.c_str() + s.size();
 }
 
-static void do_zadd(std::vector<std::string> &cmd, Buffer &out){
+void do_zadd(std::vector<std::string> &cmd, Buffer &out){
     double score = 0;
     if(!str2dbl(cmd[2], score)){
         return out_err(out, ERR_BAD_ARG, "expect float");
@@ -419,9 +351,9 @@ static void do_zadd(std::vector<std::string> &cmd, Buffer &out){
     return out_int(out, (int64_t)added);
 }
 
-static const ZSet k_empty_zset;
+const ZSet k_empty_zset;
 
-static ZSet *expect_zset(std::string &s){
+ZSet *expect_zset(std::string &s){
     LookupKey key;
     key.key.swap(s);
     key.node.hcode = str_hash((uint8_t *) key.key.data(), key.key.size());
@@ -433,7 +365,7 @@ static ZSet *expect_zset(std::string &s){
     return ent->type == T_ZSET ? &ent->zset : NULL;
 }
 
-static void do_zrem(std::vector<std::string> &cmd, Buffer &out){
+void do_zrem(std::vector<std::string> &cmd, Buffer &out){
     ZSet *zset = expect_zset(cmd[1]);
     if(!zset){
         return out_err(out, ERR_BAD_TYP, "expect zset");
@@ -447,7 +379,7 @@ static void do_zrem(std::vector<std::string> &cmd, Buffer &out){
     return out_int(out, znode ? 1 : 0);
 }
 
-static void do_zscore(std::vector<std::string> &cmd, Buffer &out){
+void do_zscore(std::vector<std::string> &cmd, Buffer &out){
     ZSet *zset = expect_zset(cmd[1]);
     if(!zset){
         return out_err(out, ERR_BAD_TYP, "expect zset");
@@ -458,7 +390,7 @@ static void do_zscore(std::vector<std::string> &cmd, Buffer &out){
     return znode ? out_dbl(out, znode->score) : out_nil(out); 
 }
 
-static void do_zquery(std::vector<std::string> &cmd, Buffer &out){
+void do_zquery(std::vector<std::string> &cmd, Buffer &out){
     double score = 0;
     if(!str2dbl(cmd[2], score)) {
         return out_err(out, ERR_BAD_ARG, "expect fp nummber");
@@ -493,7 +425,7 @@ static void do_zquery(std::vector<std::string> &cmd, Buffer &out){
     out_end_arr(out, ctx, (uint32_t)n);
 }
 
-static void do_expire(std::vector<std::string> &cmd, Buffer &out) {
+void do_expire(std::vector<std::string> &cmd, Buffer &out) {
     
     int64_t ttl_ms = 0;
     if (!str2int(cmd[2], ttl_ms)) {
@@ -512,7 +444,7 @@ static void do_expire(std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, node ? 1: 0);
 }
 
-static void do_ttl(std::vector<std::string> &cmd, Buffer &out) {
+void do_ttl(std::vector<std::string> &cmd, Buffer &out) {
     LookupKey key;
     key.key.swap(cmd[1]);
     key.node.hcode = str_hash((uint8_t *)key.key.data(), key.key.size());
@@ -532,7 +464,7 @@ static void do_ttl(std::vector<std::string> &cmd, Buffer &out) {
     return out_int(out, expire_at > now_ms ? (expire_at - now_ms) : 0);
 }
 
-static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
+bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
     if(cur + 4 > end){
         return false;
     }
@@ -542,7 +474,7 @@ static bool read_u32(const uint8_t *&cur, const uint8_t *end, uint32_t &out){
     return true;
 }
 
-static bool read_str(const uint8_t *&cur, const uint8_t *end, size_t n, std::string &out){
+bool read_str(const uint8_t *&cur, const uint8_t *end, size_t n, std::string &out){
     if(cur + n > end){
         return false;
     }
@@ -552,7 +484,7 @@ static bool read_str(const uint8_t *&cur, const uint8_t *end, size_t n, std::str
     return true;
 }
 
-static int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::string> &out){
+int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::string> &out){
     const uint8_t *end = data + size;
     uint32_t nstr = 0;
     if(!read_u32(data, end, nstr)){
@@ -581,7 +513,7 @@ static int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::stri
 }
 
 
-static void do_request(std::vector<std::string> &cmd, Buffer &out){
+void do_request(std::vector<std::string> &cmd, Buffer &out){
     if(cmd.size() == 2 && cmd[0] == "get"){
        return  do_get(cmd, out);
     } else if(cmd.size() == 3 && cmd[0] == "set"){
@@ -608,16 +540,16 @@ static void do_request(std::vector<std::string> &cmd, Buffer &out){
 }
 
 
-static void response_begin(Buffer &out, size_t *header){
+void response_begin(Buffer &out, size_t *header){
     *header = out.size();
     buf_append_u32(out, 0);
 }
 
-static size_t response_size(Buffer &out, size_t header){
+size_t response_size(Buffer &out, size_t header){
     return out.size() - header - 4;
 }
 
-static void response_end(Buffer &out, size_t header){
+void response_end(Buffer &out, size_t header){
     size_t msg_size = response_size(out, header);
     if(msg_size > k_max_msg){
         out.resize(header + 4);
@@ -629,7 +561,7 @@ static void response_end(Buffer &out, size_t header){
     memcpy(&out[header], &len, 4);
 }
 
-static bool try_one_request(Conn *conn){
+bool try_one_request(Conn *conn){
     if(conn->incoming.size() < 4){
         return false;
     }
@@ -662,7 +594,7 @@ static bool try_one_request(Conn *conn){
     return true;
 }
 
-static void handle_write(Conn *conn){
+void handle_write(Conn *conn){
     assert(conn->outgoing.size() > 0);
     ssize_t rv = write(conn->fd, &conn->outgoing[0], conn->outgoing.size());
 
@@ -684,7 +616,7 @@ static void handle_write(Conn *conn){
     }
 }
 
-static void handle_read(Conn *conn){
+void handle_read(Conn *conn){
     uint8_t buf[64 * 1024];
     ssize_t rv = read(conn->fd, buf, sizeof(buf));
     if(rv < 0 && errno == EAGAIN){
@@ -720,7 +652,7 @@ static void handle_read(Conn *conn){
 
 const uint64_t k_idle_timeout_ms = 5 * 60 * 1000;
 
-static uint32_t next_timer_ms() {
+uint32_t next_timer_ms() {
     uint64_t now_ms = get_monotonic_msec();
     uint64_t next_ms = (uint64_t)-1;    
     if (!dlist_empty(&g_data.idle_list)) {
@@ -741,11 +673,11 @@ static uint32_t next_timer_ms() {
     return (int32_t)(next_ms - now_ms);
 }
 
-static bool hnode_same(HNode *node, HNode *key) {
+bool hnode_same(HNode *node, HNode *key) {
     return node == key;
 }
 
-static void process_timers() {
+void process_timers() {
     uint64_t now_ms = get_monotonic_msec();
     
     while (!dlist_empty(&g_data.idle_list)) {
@@ -773,93 +705,4 @@ static void process_timers() {
             break;
         }
     }
-}
-
-int main(){    
-    dlist_init(&g_data.idle_list);
-    thread_pool_init(&g_data.thread_pool, 4);
-
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(fd < 0){
-        die("socket()");
-    }
-
-    int val = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
-    addr.sin_addr.s_addr = ntohl(0);
-    int rv = bind(fd, (const struct sockaddr *)&addr, sizeof(addr));
-    if (rv) { die("bind()"); }
-
-    fd_set_nb(fd);
-
-    rv = listen(fd, SOMAXCONN);
-    if(rv){die("listen()");}
-
-
-    std::vector<struct pollfd> poll_args;
-    while(true){
-        poll_args.clear();
-        struct pollfd pfd = {fd, POLLIN, 0};
-        poll_args.push_back(pfd);
-        for(Conn *conn : g_data.fd2conn){
-            if(!conn){
-                continue;
-            }
-
-            struct pollfd pfd = {conn->fd, POLLERR, 0};
-            if(conn->want_read){
-                pfd.events |= POLLIN;
-            }
-            if(conn->want_write){
-                pfd.events |= POLLOUT;
-            }
-            poll_args.push_back(pfd);
-        }
-
-        int32_t timeout_ms = next_timer_ms();
-        int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), timeout_ms);
-        if(rv < 0 && errno == EINTR){
-            continue;
-        }
-        if(rv < 0){
-            die("poll");
-        }
-
-        if(poll_args[0].revents){
-            handle_accept(fd);
-        }
-
-        for(size_t i = 1; i < poll_args.size(); i++){
-            uint32_t ready = poll_args[i].revents;
-            if(ready == 0){
-                continue;
-            }
-
-            Conn *conn = g_data.fd2conn[poll_args[i].fd];
-            conn->last_active_ms = get_monotonic_msec();
-            dlist_detach(&conn->idle_node);
-            dlist_insert_before(&g_data.idle_list, &conn->idle_node);
-
-            if(ready & POLLIN){
-                assert(conn->want_read);
-                handle_read(conn);
-            }
-            if(ready & POLLOUT){
-                assert(conn->want_write);
-                handle_write(conn);
-            }
-
-            if((ready & POLLERR) || conn->want_close){
-                conn_destroy(conn);
-            }
-        }
-        process_timers();
-    }
-    
-
-    return 0;
 }
