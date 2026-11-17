@@ -20,16 +20,16 @@ target_link_options(project_options INTERFACE
 )
 
 set(CLIENT_SOURCES
-    src/14/client/client.cpp
+    src/client/client.cpp
 )
 
 set(SERVER_SOURCES
-    src/14/server/avl.cpp
-    src/14/server/hashtable.cpp
-    src/14/server/heap.cpp
-    src/14/server/server.cpp
-    src/14/server/thread_pool.cpp
-    src/14/server/zset.cpp
+    src/server/avl.cpp
+    src/server/hashtable.cpp
+    src/server/heap.cpp
+    src/server/server.cpp
+    src/server/thread_pool.cpp
+    src/server/zset.cpp
     
 )
 
