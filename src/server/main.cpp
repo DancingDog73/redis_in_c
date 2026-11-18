@@ -29,15 +29,26 @@
 int main(int argc, char* argv[]){    
 
     int port = 1234;
-    if(argc > 1){
+    if(argc >= 2){
         int dm_port = std::stoi(argv[1]);
         if(dm_port > 1023 && dm_port < 49152){
             port = dm_port;
         }
-    } else {
-        std::cout << "You can specify the port of the app : like this : " << argv[0] << " <port> !\n";
     }
-    Server server{};
+
+    int timeOut = 5 * 60 * 1000;
+    if(argc >= 3){
+        int t = std::stoi(argv[2]);
+        if(t > 0){
+            timeOut = t * 1000;
+        }
+    } else {
+        std::cout << "You can specify the port and timeout of the app : like this : " << argv[0] << " <port> <timeout>!\n";
+
+    }
+
+
+    Server server{static_cast<uint64_t>(timeOut)};
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){

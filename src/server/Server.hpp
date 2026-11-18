@@ -19,9 +19,10 @@ class Server{
         DList idle_list;
         std::vector<HeapItem> heap;
         TheadPool thread_pool;
+        int idleTimeOutMs;
 
     public:
-        Server();
+        Server(uint64_t t);
         virtual ~Server();
         HMap* getDb();
         std::vector<Conn *>& getConnections();
@@ -31,6 +32,7 @@ class Server{
         Conn* getConnection(int num);
         void ensureConnCapacity(size_t capacity);
         void setConnection(int num, Conn* conn);
+        uint64_t getIdleTimeOut();
 
 
 

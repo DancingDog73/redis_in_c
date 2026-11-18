@@ -3,9 +3,10 @@
 
 
 
-Server::Server(){
+Server::Server(uint64_t t){
     dlist_init(&idle_list);
     thread_pool_init(&thread_pool, 4);
+    idleTimeOutMs = t;
 }
 
 Server::~Server(){
@@ -50,4 +51,8 @@ void Server::ensureConnCapacity(size_t capacity){
     if(fd2conn.size() <= capacity){
         fd2conn.resize(capacity + 1);
     }
+}
+
+uint64_t Server::getIdleTimeOut(){
+    return idleTimeOutMs;
 }

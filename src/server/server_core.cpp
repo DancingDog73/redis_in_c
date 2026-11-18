@@ -648,14 +648,13 @@ void handle_read(Conn *conn, Server& server){
     }
 }
 
-const uint64_t k_idle_timeout_ms = 5 * 60 * 1000;
 
 uint32_t next_timer_ms(Server& server) {
     uint64_t now_ms = get_monotonic_msec();
     uint64_t next_ms = (uint64_t)-1;    
     if (!dlist_empty(server.getIdleList())) {
-        Conn *conn = container_of(server.getIdleList(), Conn, idle_node);
-        next_ms = conn->last_active_ms + k_idle_timeout_ms;
+        Conn *conn = container_of(server.getIdleList()->next, Conn, idle_node);
+        next_ms = conn->last_active_ms + server.getIdleTimeOut();
     }
     
     if (!server.getHeap().empty() && server.getHeap()[0].val < next_ms) {
@@ -680,7 +679,7 @@ void process_timers(Server& server) {
     
     while (!dlist_empty(server.getIdleList())) {
         Conn *conn = container_of(server.getIdleList()->next, Conn, idle_node);
-        uint64_t next_ms = conn->last_active_ms + k_idle_timeout_ms;
+        uint64_t next_ms = conn->last_active_ms + server.getIdleTimeOut();
         if (next_ms >= now_ms) {
             break;  
         }
