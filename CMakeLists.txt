@@ -30,6 +30,7 @@ set(SERVER_CORE_SOURCES
     src/server/thread_pool.cpp
     src/server/zset.cpp
     src/server/server_core.cpp
+    src/server/Server.cpp
     
 )
 

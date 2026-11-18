@@ -23,10 +23,11 @@
 #include "thread_pool.h"
 
 #include "server_core.hpp"
+#include "Server.hpp"
 
 int main(){    
-    dlist_init(&g_data.idle_list);
-    thread_pool_init(&g_data.thread_pool, 4);
+
+    Server server{};
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){
@@ -54,7 +55,7 @@ int main(){
         poll_args.clear();
         struct pollfd pfd = {fd, POLLIN, 0};
         poll_args.push_back(pfd);
-        for(Conn *conn : g_data.fd2conn){
+        for(Conn *conn : server.getConnections()){
             if(!conn){
                 continue;
             }
@@ -69,7 +70,7 @@ int main(){
             poll_args.push_back(pfd);
         }
 
-        int32_t timeout_ms = next_timer_ms();
+        int32_t timeout_ms = next_timer_ms(server);
         int rv = poll(poll_args.data(), (nfds_t)poll_args.size(), timeout_ms);
         if(rv < 0 && errno == EINTR){
             continue;
@@ -79,7 +80,7 @@ int main(){
         }
 
         if(poll_args[0].revents){
-            handle_accept(fd);
+            handle_accept(fd, server);
         }
 
         for(size_t i = 1; i < poll_args.size(); i++){
@@ -88,14 +89,14 @@ int main(){
                 continue;
             }
 
-            Conn *conn = g_data.fd2conn[poll_args[i].fd];
+            Conn *conn = server.getConnections()[poll_args[i].fd];
             conn->last_active_ms = get_monotonic_msec();
             dlist_detach(&conn->idle_node);
-            dlist_insert_before(&g_data.idle_list, &conn->idle_node);
+            dlist_insert_before(server.getIdleList(), &conn->idle_node);
 
             if(ready & POLLIN){
                 assert(conn->want_read);
-                handle_read(conn);
+                handle_read(conn, server);
             }
             if(ready & POLLOUT){
                 assert(conn->want_write);
@@ -103,10 +104,10 @@ int main(){
             }
 
             if((ready & POLLERR) || conn->want_close){
-                conn_destroy(conn);
+                conn_destroy(conn, server);
             }
         }
-        process_timers();
+        process_timers(server);
     }
     
 
