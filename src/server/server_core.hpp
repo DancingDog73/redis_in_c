@@ -92,7 +92,6 @@ struct LookupKey {
 void msg(const char *msg);
 void msg_errno(const char *msg);
 void die(const char *msg);
-uint64_t get_monotonic_msec();
 void fd_set_nb(int fd);
 
 void buf_append(std::vector<uint8_t> &buf, const uint8_t *data, size_t len);

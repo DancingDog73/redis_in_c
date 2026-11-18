@@ -25,6 +25,7 @@
 
 #include "server_core.hpp"
 #include "Server.hpp"
+#include "Clock.hpp"
 
 int main(int argc, char* argv[]){    
 
@@ -47,8 +48,8 @@ int main(int argc, char* argv[]){
 
     }
 
-
-    Server server{static_cast<uint64_t>(timeOut)};
+    MonotonicClock clock{};
+    Server server{static_cast<uint64_t>(timeOut), clock};
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if(fd < 0){
@@ -111,7 +112,7 @@ int main(int argc, char* argv[]){
             }
 
             Conn *conn = server.getConnections()[poll_args[i].fd];
-            conn->last_active_ms = get_monotonic_msec();
+            conn->last_active_ms = server.nowMs();
             dlist_detach(&conn->idle_node);
             dlist_insert_before(server.getIdleList(), &conn->idle_node);
 

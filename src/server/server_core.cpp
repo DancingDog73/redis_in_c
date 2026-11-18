@@ -33,11 +33,7 @@ void die(const char *msg){
     abort();
 }
 
-uint64_t get_monotonic_msec() {
-    struct timespec tv = {0, 0};
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return uint64_t(tv.tv_sec) * 1000 + tv.tv_nsec / 1000 / 1000;
-}
+
 
 void fd_set_nb(int fd){
     errno = 0;
@@ -90,7 +86,7 @@ int32_t handle_accept(int fd, Server& server){
     Conn *conn = new Conn();
     conn->fd = connfd;
     conn->want_read = true;
-    conn->last_active_ms = get_monotonic_msec();
+    conn->last_active_ms = server.nowMs();
     dlist_insert_before(server.getIdleList(), &conn->idle_node);
     
     server.ensureConnCapacity((size_t) conn->fd);
@@ -302,7 +298,7 @@ void entry_set_ttl(Entry *ent, int64_t ttl_ms, Server& server) {
         ent->heap_idx = -1;
     } else if (ttl_ms >= 0) {
         
-        uint64_t expire_at = get_monotonic_msec() + (uint64_t)ttl_ms;
+        uint64_t expire_at = server.nowMs() + (uint64_t)ttl_ms;
         HeapItem item = {expire_at, &ent->heap_idx};
         heap_upsert(server.getHeap(), ent->heap_idx, item);
     }
@@ -458,7 +454,7 @@ void do_ttl(std::vector<std::string> &cmd, Buffer &out, Server& server) {
     }
 
     uint64_t expire_at = server.getHeap()[ent->heap_idx].val;
-    uint64_t now_ms = get_monotonic_msec();
+    uint64_t now_ms = server.nowMs();
     return out_int(out, expire_at > now_ms ? (expire_at - now_ms) : 0);
 }
 
@@ -650,7 +646,7 @@ void handle_read(Conn *conn, Server& server){
 
 
 uint32_t next_timer_ms(Server& server) {
-    uint64_t now_ms = get_monotonic_msec();
+    uint64_t now_ms = server.nowMs();
     uint64_t next_ms = (uint64_t)-1;    
     if (!dlist_empty(server.getIdleList())) {
         Conn *conn = container_of(server.getIdleList()->next, Conn, idle_node);
@@ -675,7 +671,7 @@ bool hnode_same(HNode *node, HNode *key) {
 }
 
 void process_timers(Server& server) {
-    uint64_t now_ms = get_monotonic_msec();
+    uint64_t now_ms = server.nowMs();
     
     while (!dlist_empty(server.getIdleList())) {
         Conn *conn = container_of(server.getIdleList()->next, Conn, idle_node);

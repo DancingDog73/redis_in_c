@@ -3,7 +3,7 @@
 
 
 
-Server::Server(uint64_t t){
+Server::Server(uint64_t t, Clock& c): clock{c}{
     dlist_init(&idle_list);
     thread_pool_init(&thread_pool, 4);
     idleTimeOutMs = t;
@@ -55,4 +55,8 @@ void Server::ensureConnCapacity(size_t capacity){
 
 uint64_t Server::getIdleTimeOut(){
     return idleTimeOutMs;
+}
+
+uint64_t Server::nowMs(){
+   return clock.nowMs();
 }

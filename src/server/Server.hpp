@@ -8,6 +8,7 @@
 #include "list.h"
 #include "heap.h"
 #include "thread_pool.h"
+#include "Clock.hpp"
 
 struct Conn;
 
@@ -20,9 +21,10 @@ class Server{
         std::vector<HeapItem> heap;
         TheadPool thread_pool;
         int idleTimeOutMs;
+        Clock& clock;
 
     public:
-        Server(uint64_t t);
+        Server(uint64_t t, Clock& c);
         virtual ~Server();
         HMap* getDb();
         std::vector<Conn *>& getConnections();
@@ -33,6 +35,7 @@ class Server{
         void ensureConnCapacity(size_t capacity);
         void setConnection(int num, Conn* conn);
         uint64_t getIdleTimeOut();
+        uint64_t nowMs();
 
 
 
