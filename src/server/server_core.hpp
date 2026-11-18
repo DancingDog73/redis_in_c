@@ -46,8 +46,6 @@ struct GlobalData{
 
 };
 
-extern GlobalData g_data;
-
 
 enum {
     ERR_UNKNOWN = 1,
@@ -134,3 +132,8 @@ void process_timers(Server& server);
 
 void handle_read(Conn *conn, Server& server);
 void handle_write(Conn *conn);
+
+
+void do_request(std::vector<std::string> &cmd, Buffer &out, Server& server);
+bool try_one_request(Conn *conn, Server& server);
+int32_t parse_req(const uint8_t *data, size_t size, std::vector<std::string> &out);

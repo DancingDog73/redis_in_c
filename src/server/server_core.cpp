@@ -18,7 +18,6 @@
 
 #include "server_core.hpp"
 
-GlobalData g_data; 
 
 void msg(const char *msg){
     fprintf(stderr, "%s\n", msg);

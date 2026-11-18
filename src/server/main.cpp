@@ -16,13 +16,6 @@
 #include <string>
 #include <iostream>
 
-#include "common.h"
-#include "zset.h"
-#include "hashtable.h"
-#include "list.h"
-#include "heap.h"
-#include "thread_pool.h"
-
 #include "server_core.hpp"
 #include "Server.hpp"
 #include "Clock.hpp"
