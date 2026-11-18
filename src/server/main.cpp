@@ -14,6 +14,7 @@
 #include <netinet/ip.h>
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include "common.h"
 #include "zset.h"
@@ -25,8 +26,17 @@
 #include "server_core.hpp"
 #include "Server.hpp"
 
-int main(){    
+int main(int argc, char* argv[]){    
 
+    int port = 1234;
+    if(argc > 1){
+        int dm_port = std::stoi(argv[1]);
+        if(dm_port > 1023 && dm_port < 49152){
+            port = dm_port;
+        }
+    } else {
+        std::cout << "You can specify the port of the app : like this : " << argv[0] << " <port> !\n";
+    }
     Server server{};
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -39,7 +49,7 @@ int main(){
 
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
+    addr.sin_port = ntohs(port);
     addr.sin_addr.s_addr = ntohl(0);
     int rv = bind(fd, (const struct sockaddr *)&addr, sizeof(addr));
     if (rv) { die("bind()"); }
